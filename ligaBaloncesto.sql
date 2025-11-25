@@ -34,7 +34,7 @@ create table partido(
 );
 
 
--- primero inserto capitanes para que no me falle al referenciarlo con los demás jugadores 
+-- Primero inserto capitanes para que no me falle al referenciarlo con los demás jugadores 
 
 INSERT INTO equipo(idEquipo, nombreEquipo, ciudad, webOficial, puntos) VALUES(101, "FC Barcelona Básquet", "Barcelona", "https://www.fcbarcelona.com", 10);
 INSERT INTO equipo(idEquipo, nombreEquipo, ciudad, webOficial, puntos) VALUES(102, "Real Madrid", "Madrid", "https://www.realmadrid.com", 9);

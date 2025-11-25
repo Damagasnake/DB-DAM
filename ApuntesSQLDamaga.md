@@ -1,4 +1,3 @@
-# 🗃️ HIPERCHULETA SQL - De 0 a JOINs
 
 ---
 
@@ -691,4 +690,4 @@ WHERE columna > (SELECT AVG(columna) FROM tabla);
 
 ---
 
-> 🍀 **¡Buena suerte en el examen!**
+
