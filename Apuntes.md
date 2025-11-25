@@ -1044,3 +1044,225 @@ WHERE columna REGEXP 'patron'       -- Expresión regular
 ```
 
 ---
+
+## Ejemplo 1: Subconsulta simple en WHERE
+
+```sql
+SELECT nombre, salarioBruto
+FROM jugador
+WHERE salarioBruto = (SELECT MAX(salarioBruto) FROM jugador);
+```
+
+**Paso 1:** Leo la subconsulta
+```sql
+(SELECT MAX(salarioBruto) FROM jugador)
+```
+→ "¿Cuál es el salario más alto?"
+→ Resultado: `2300`
+
+**Paso 2:** Sustituyo
+```sql
+SELECT nombre, salarioBruto
+FROM jugador
+WHERE salarioBruto = 2300;
+```
+
+**Lectura completa:** "Dame el jugador que tiene el salario más alto"
+
+---
+
+## Ejemplo 2: Subconsulta con IN (devuelve lista)
+
+```sql
+SELECT nombreEquipo
+FROM equipo
+WHERE idEquipo IN (SELECT DISTINCT idEquipo FROM jugador WHERE posicion = 'Pivot');
+```
+
+**Paso 1:** Leo la subconsulta
+```sql
+(SELECT DISTINCT idEquipo FROM jugador WHERE posicion = 'Pivot')
+```
+→ "¿En qué equipos hay pivots?"
+→ Resultado: `101, 103, 104, 105` (una lista)
+
+**Paso 2:** Sustituyo
+```sql
+SELECT nombreEquipo
+FROM equipo
+WHERE idEquipo IN (101, 103, 104, 105);
+```
+
+**Lectura completa:** "Dame los nombres de equipos que tienen algún pivot"
+
+---
+
+## Ejemplo 3: Subconsulta en SELECT con condición relacionada
+
+```sql
+SELECT 
+    e.nombreEquipo,
+    (SELECT COUNT(*) FROM jugador j WHERE j.idEquipo = e.idEquipo) AS num_jugadores
+FROM equipo e;
+```
+
+**Paso 1:** Leo la subconsulta
+```sql
+(SELECT COUNT(*) FROM jugador j WHERE j.idEquipo = e.idEquipo)
+```
+→ "Cuenta jugadores DONDE el idEquipo del jugador = idEquipo del equipo actual"
+
+**Paso 2:** ¿Qué pasa aquí?
+
+Esta subconsulta es especial: usa `e.idEquipo` que viene de la consulta principal. Se ejecuta **una vez por cada equipo**:
+
+- Para FC Barcelona (idEquipo=101): cuenta jugadores del 101 → `3`
+- Para Real Madrid (idEquipo=102): cuenta jugadores del 102 → `3`
+- Para Valencia (idEquipo=103): cuenta jugadores del 103 → `2`
+- etc.
+
+**Resultado:**
+
+| nombreEquipo | num_jugadores |
+|--------------|---------------|
+| FC Barcelona | 3 |
+| Real Madrid | 3 |
+| Valencia | 2 |
+| Zaragoza | 6 |
+| Gran Canaria | 5 |
+| Baskonia | 0 |
+
+**Lectura completa:** "Para cada equipo, muéstrame su nombre y cuántos jugadores tiene"
+
+---
+
+## Ejemplo 4: Dos subconsultas en SELECT
+
+```sql
+SELECT 
+    nombre,
+    salarioBruto,
+    (SELECT MIN(salarioBruto) FROM jugador) AS salario_minimo,
+    (SELECT MAX(salarioBruto) FROM jugador) AS salario_maximo
+FROM jugador
+WHERE idEquipo = 102;
+```
+
+**Paso 1:** Leo las subconsultas
+```sql
+(SELECT MIN(salarioBruto) FROM jugador)  → 1700
+(SELECT MAX(salarioBruto) FROM jugador)  → 2300
+```
+
+**Paso 2:** Sustituyo
+```sql
+SELECT 
+    nombre,
+    salarioBruto,
+    1700 AS salario_minimo,
+    2300 AS salario_maximo
+FROM jugador
+WHERE idEquipo = 102;
+```
+
+**Resultado:**
+
+| nombre | salarioBruto | salario_minimo | salario_maximo |
+|--------|--------------|----------------|----------------|
+| Adonis | 1700 | 1700 | 2300 |
+| Zoe | 1800 | 1700 | 2300 |
+| Ana Belén | 2200 | 1700 | 2300 |
+
+**Lectura completa:** "Para cada jugador del equipo 102, muestra su salario y también el mínimo y máximo de toda la liga"
+
+---
+
+## Ejemplo 5: Subconsulta dentro de subconsulta
+
+```sql
+SELECT nombre, salarioBruto
+FROM jugador
+WHERE salarioBruto > (
+    SELECT AVG(salarioBruto) 
+    FROM jugador 
+    WHERE idEquipo = (SELECT idEquipo FROM equipo WHERE ciudad = 'Madrid')
+);
+```
+
+**Paso 1:** Leo la subconsulta MÁS INTERNA primero
+```sql
+(SELECT idEquipo FROM equipo WHERE ciudad = 'Madrid')
+```
+→ "¿Cuál es el idEquipo del equipo de Madrid?"
+→ Resultado: `102`
+
+**Paso 2:** Sustituyo y leo la siguiente subconsulta
+```sql
+(SELECT AVG(salarioBruto) FROM jugador WHERE idEquipo = 102)
+```
+→ "¿Cuál es el salario promedio del equipo 102?"
+→ Resultado: `1900`
+
+**Paso 3:** Sustituyo en la consulta principal
+```sql
+SELECT nombre, salarioBruto
+FROM jugador
+WHERE salarioBruto > 1900;
+```
+
+**Lectura completa:** "Dame los jugadores que ganan más que el promedio del Real Madrid"
+
+---
+
+## Ejemplo 6: Subconsulta en FROM (tabla derivada)
+
+```sql
+SELECT AVG(total) AS promedio_jugadores_por_equipo
+FROM (
+    SELECT idEquipo, COUNT(*) AS total
+    FROM jugador
+    GROUP BY idEquipo
+) AS jugadores_por_equipo;
+```
+
+**Paso 1:** Leo la subconsulta interna
+```sql
+SELECT idEquipo, COUNT(*) AS total
+FROM jugador
+GROUP BY idEquipo
+```
+→ "Cuántos jugadores tiene cada equipo"
+→ Resultado:
+
+| idEquipo | total |
+|----------|-------|
+| 101 | 3 |
+| 102 | 3 |
+| 103 | 2 |
+| 104 | 6 |
+| 105 | 5 |
+
+**Paso 2:** Esa tabla temporal se llama `jugadores_por_equipo`. Ahora la consulta principal:
+```sql
+SELECT AVG(total) AS promedio_jugadores_por_equipo
+FROM jugadores_por_equipo;
+```
+→ "Calcula el promedio de la columna total"
+→ Promedio de (3, 3, 2, 6, 5) = `3.8`
+
+**Lectura completa:** "¿Cuál es el promedio de jugadores por equipo?"
+
+---
+
+## Resumen de tipos de subconsulta
+
+| Ubicación | Qué devuelve | Ejemplo |
+|-----------|--------------|---------|
+| `WHERE col = (...)` | UN valor | El máximo, mínimo, promedio... |
+| `WHERE col IN (...)` | Una LISTA | IDs que cumplen algo |
+| `SELECT ..., (...) AS col` | UN valor por fila | Añadir columna calculada |
+| `FROM (...) AS tabla` | Una TABLA temporal | Calcular sobre resultados agrupados |
+
+---
+
+¿Quieres que practiquemos con algún caso específico de tus bases de datos (hospital o liga)?
